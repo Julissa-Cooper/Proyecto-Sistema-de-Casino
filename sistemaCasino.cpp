@@ -245,3 +245,196 @@ void mostrarDespedida(const string &nombre, double saldo) {
     cout << DORADO << NEGRITA << "\nSaldo final de " << nombre << ": $" << formatoMonto(saldo) << RESET << endl;
     cout << VERDE_INT << "Gracias por jugar, " << nombre << "! Hasta luego." << RESET << endl;
 }
+
+//Funciones del flujo del gameplay
+
+// 00 - Identificacion del usuario y control de acceso: pide nombre y edad
+bool validarAcceso(string &nombre) {
+    int edad;
+
+    //limpia el buffer antes de getline, esto esa acá para evitar cosas raras con la entrada.
+    cin.ignore(1000, '\n'); 
+    cout << CIAN << "\nIngrese nombre del jugador: " << RESET;
+    getline(cin, nombre);
+
+    cout << CIAN << "Ingrese su edad: " << RESET;
+    cin >> edad;
+
+    //Si es de la choza de los pequeñines enontces fuera, sino, entonces dentro
+    if (edad >= 18) {
+        cout << VERDE_INT << "Bienvenido, " << nombre << "!" << RESET << endl;
+        return true;
+    } else {
+        cout << ROJO_INT << "Acceso denegado, " << nombre << " eres menor de edad" << RESET << endl;
+        pausar();
+        return false;
+    }
+}
+
+// 01 - Ingreso y validacion de saldo inicial
+double leerSaldoInicial() {
+    double saldo;
+    do {
+        cout << DORADO << "Ingrese saldo inicial: $" << RESET;
+        cin >> saldo;
+        if (saldo <= 0) cout << ROJO << "Error: Saldo invalido" << RESET << endl;
+    } while (saldo <= 0);
+    return saldo;
+}
+
+// 02 - Menu principal
+int leerOpcionMenuPrincipal(const string &nombre, double saldo) {
+    int opcion;
+    cout << ROSA << NEGRITA << "\n===== MENU PRINCIPAL - " << nombre << " =====" << RESET << endl;
+    cout << VERDE_INT << "Saldo: $" << formatoMonto(saldo) << RESET << endl;
+    cout << "1. Ver saldo" << endl;
+    cout << "2. Ver apuesta anterior" << endl;
+    cout << "3. Jugar" << endl;
+    cout << "4. Retirarse" << endl;
+    cout << CIAN << "Elija una opcion (1-4): " << RESET;
+    cin >> opcion;
+    return opcion;
+}
+
+// 03 - Menu de juegos
+int leerOpcionMenuJuegos(const string &nombre, double saldo) {
+    int opcion;
+    cout << ROSA << NEGRITA << "\n===== MENU DE JUEGOS - " << nombre << " =====" << RESET << endl;
+    cout << VERDE_INT << "Saldo actual: $" << formatoMonto(saldo) << RESET << endl;
+    cout << "1. Regresar al menu principal" << endl;
+    cout << "2. Ruleta" << endl;
+    cout << "3. Tragamonedas" << endl;
+    cout << "4. Dados" << endl;
+    cout << CIAN << "Elija una opcion (1-4): " << RESET;
+    cin >> opcion;
+    return opcion;
+}
+
+//Se pide cuanto se va a apostar 
+double pedirApuesta(double saldo) {
+    double apuesta;
+    do {
+        cout << DORADO << "Ingrese monto a apostar: $" << RESET;
+        cin >> apuesta;
+        if (!(apuesta > 0 && apuesta <= saldo)) {
+            cout << ROJO << "Monto invalido, debe ser mayor a 0 y menor o igual al saldo." << RESET << endl;
+        }
+    } while (!(apuesta > 0 && apuesta <= saldo));
+    return apuesta;
+}
+
+//Jueguitos: cada uno modifica el saldo (por referencia) y devuelve el texto de resultado
+
+string jugarRuleta(double &saldo, double apuesta) {
+    cout << MAGENTA_INT << NEGRITA << "\n--- RULETA ---" << RESET << endl;
+
+    string colores[3] = {"Rojo", "Negro", "Verde"};
+    cout << "Colores disponibles:" << endl;
+    for (int i = 0; i < 3; i++) {
+        cout << (i + 1) << ". " << colores[i] << endl;
+    }
+
+    int eleccion;
+    do {
+        cout << CIAN << "Elija un color (1-3): " << RESET;
+        cin >> eleccion;
+    } while (eleccion < 1 || eleccion > 3);
+
+    cout << AMARILLO << "Girando la ruleta..." << RESET << endl;
+
+    // 0-36
+    int numero = rand() % 37;
+    string colorSalido;
+    if (numero == 0) colorSalido = "Verde";
+    else if (numero % 2 == 0) colorSalido = "Negro";
+    else colorSalido = "Rojo";
+
+    cout << AMARILLO << "La ruleta cayo en: " << numero << " (" << colorSalido << ")" << RESET << endl;
+
+    string resultado;
+    if (colores[eleccion - 1] == colorSalido) {
+        double multiplicador;
+        if (colorSalido == "Verde") multiplicador = 14.0;
+        else multiplicador = 2.0;
+
+        double premio = apuesta * multiplicador;
+        saldo += premio;
+        resaltarMonto("GANASTE en Ruleta", premio, true);
+        resultado = "Gano $" + formatoMonto(premio) + " en Ruleta";
+    } else {
+        saldo -= apuesta;
+        resaltarMonto("PERDISTE en Ruleta", apuesta, false);
+        resultado = "Perdio $" + formatoMonto(apuesta) + " en Ruleta";
+    }
+    return resultado;
+}
+
+string jugarTragamonedas(double &saldo, double apuesta) {
+    cout << MAGENTA_INT << NEGRITA << "\n--- TRAGAMONEDAS ---" << RESET << endl;
+
+    int carrete[3];
+    cout << AMARILLO << "Girando: " << RESET;
+    for (int i = 0; i < 3; i++) {
+        // 0-4
+        carrete[i] = rand() % 5;
+        cout << CIAN_INT << "[" << carrete[i] << "] " << RESET;
+    }
+    cout << endl;
+
+    string resultado;
+    if (carrete[0] == carrete[1] && carrete[1] == carrete[2]) {
+        double premio = apuesta * 5.0;
+        saldo += premio;
+        resaltarMonto("JACKPOT en Tragamonedas", premio, true);
+        resultado = "JACKPOT! Gano $" + formatoMonto(premio);
+    } else if (carrete[0] == carrete[1] || carrete[1] == carrete[2] || carrete[0] == carrete[2]) {
+        cout << AMARILLO << "Dos simbolos iguales: empate, saldo sin cambio." << RESET << endl;
+        resultado = "Empate: saldo sin cambio";
+    } else {
+        saldo -= apuesta;
+        resaltarMonto("PERDISTE en Tragamonedas", apuesta, false);
+        resultado = "Perdio $" + formatoMonto(apuesta) + " en Tragamonedas";
+    }
+    return resultado;
+}
+
+string jugarDados(double &saldo, double apuesta) {
+    cout << MAGENTA_INT << NEGRITA << "\n--- DADOS ---" << RESET << endl;
+    cout << "Etapa: 1. ALTA (8-12)   2. BAJA (2-6)" << endl;
+
+    int eleccionDado;
+    do {
+        cout << CIAN << "Elija opcion (1-2): " << RESET;
+        cin >> eleccionDado;
+    } while (eleccionDado != 1 && eleccionDado != 2);
+
+    cout << AMARILLO << "Lanzando los dados..." << RESET << endl;
+
+    int d1 = rand() % 6 + 1;
+    int d2 = rand() % 6 + 1;
+    int suma = d1 + d2;
+    cout << AMARILLO << "Dados: " << d1 << " y " << d2 << "  => suma = " << suma << RESET << endl;
+
+    string resultado;
+    if (suma == 7) {
+        cout << ROJO_INT << NEGRITA << "La casa gana con 7." << RESET << endl;
+        saldo -= apuesta;
+        resaltarMonto("La casa gano con 7 - PERDISTE", apuesta, false);
+        resultado = "Perdio $" + formatoMonto(apuesta) + " en Dados (la casa gano con 7)";
+    } else {
+        bool prediccionCorrecta = false;
+        if (eleccionDado == 1 && suma >= 8 && suma <= 12) prediccionCorrecta = true;
+        if (eleccionDado == 2 && suma >= 2 && suma <= 6) prediccionCorrecta = true;
+
+        if (prediccionCorrecta) {
+            saldo += apuesta;
+            resaltarMonto("GANASTE en Dados", apuesta, true);
+            resultado = "Gano $" + formatoMonto(apuesta) + " en Dados";
+        } else {
+            saldo -= apuesta;
+            resaltarMonto("PERDISTE en Dados", apuesta, false);
+            resultado = "Perdio $" + formatoMonto(apuesta) + " en Dados";
+        }
+    }
+    return resultado;
+}
