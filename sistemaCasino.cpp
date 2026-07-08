@@ -438,3 +438,196 @@ string jugarDados(double &saldo, double apuesta) {
     }
     return resultado;
 }
+
+//Logica de una partida completa
+void jugarPartida() {
+    limpiarPantalla();
+
+    // 00 - Identificacion y control de acceso
+    string nombre;
+    if (!validarAcceso(nombre)) {
+        // acceso denegado, se regresa al menu de bienvenida
+        return; 
+    }
+
+    //Ingreso y validacion de saldo
+    double saldoInicial = leerSaldoInicial();
+    double saldo = saldoInicial;
+
+    //Arreglo de historial de la sesion
+    string histJuego[MAX_HIST];
+    double histMonto[MAX_HIST];
+    string histResultado[MAX_HIST];
+    double histSaldoDespues[MAX_HIST];
+    int histCount = 0;
+
+    histJuego[histCount] = "Saldo inicial";
+    histMonto[histCount] = 0;
+    histResultado[histCount] = "Ingreso de saldo";
+    histSaldoDespues[histCount] = saldoInicial;
+    histCount++;
+
+    //true si elige "Retirarse" en el menu principal
+    bool retirado = false;
+    //true si decide no continuar jugando tras una apuesta         
+    bool sesionTerminada = false;  
+
+    int opcionMenu;
+    // 02 - MENU PRINCIPAL
+    do {
+        limpiarPantalla();
+        opcionMenu = leerOpcionMenuPrincipal(nombre, saldo);
+
+        switch (opcionMenu) {
+
+            case 1:
+                cout << VERDE_INT << nombre << ", tu saldo es $" << formatoMonto(saldo) << RESET << endl;
+                pausar();
+                break;
+
+            case 2:
+                mostrarUltimaApuesta(histJuego, histMonto, histResultado, histCount);
+                pausar();
+                break;
+
+            case 3: {
+                int opcionJuego;
+
+                // 03 - MENU DE JUEGOS
+                do {
+                    limpiarPantalla();
+                    opcionJuego = leerOpcionMenuJuegos(nombre, saldo);
+
+                    if (opcionJuego == 1) {
+                        // regresa al menu principal
+                        break; 
+                    }
+
+                    if (opcionJuego < 1 || opcionJuego > 4) {
+                        cout << ROJO << "Opcion invalida, intente de nuevo." << RESET << endl;
+                        pausar();
+                        continue;
+                    }
+
+                    // 04 - VERIFICACION DE SALDO ANTES DE JUGAR [if/else]
+                    if (saldo <= 0) {
+                        cout << ROJO_INT << nombre << ", saldo insuficiente" << RESET << endl;
+                        pausar();
+                        //vuelve al menu de juegos 
+                        continue; 
+                    }
+
+                    double apuesta = pedirApuesta(saldo);
+                    string juego, resultado;
+
+                    switch (opcionJuego) {
+                        case 2: juego = "Ruleta";       resultado = jugarRuleta(saldo, apuesta);       break;
+                        case 3: juego = "Tragamonedas"; resultado = jugarTragamonedas(saldo, apuesta); break;
+                        case 4: juego = "Dados";        resultado = jugarDados(saldo, apuesta);        break;
+                    }
+
+                    // Se guarda en el arreglo de historial de la sesion
+                    if (histCount < MAX_HIST) {
+                        histJuego[histCount] = juego;
+                        histMonto[histCount] = apuesta;
+                        histResultado[histCount] = resultado;
+                        histSaldoDespues[histCount] = saldo;
+                        histCount++;
+                    }
+
+                    //Se guarda en archivo
+                    registrarApuestaArchivo(nombre, juego, apuesta, resultado, saldo);
+
+                    cout << "\nResultado: " << nombre << ", " << resultado<< " | Saldo actual: $" << formatoMonto(saldo) << endl;
+
+                    //¿saldo > 0 y continuar? 
+                    if (saldo <= 0) {
+                        cout << ROJO_INT << "\n" << nombre << ", te quedaste sin saldo." << RESET << endl;
+                        pausar();
+                        sesionTerminada = true;
+                        break;
+                    } else {
+                        char continuar;
+                        cout << CIAN << "Desea continuar jugando? (s/n): " << RESET;
+                        cin >> continuar;
+                        if (continuar == 'n' || continuar == 'N') {
+                            sesionTerminada = true;
+                            break;
+                        }
+                    }
+                    pausar();
+
+                } while (opcionJuego != 1 && !sesionTerminada);
+
+                break;
+            } //fin del case 3
+
+            case 4:
+                retirado = true;
+                break;
+
+            default:
+                cout << ROJO << "Opcion invalida, intente de nuevo." << RESET << endl;
+                pausar();
+        } //fin del switch opcionMenu
+
+    } while (opcionMenu != 4 && !retirado && !sesionTerminada);
+
+    //Cierre de la partida y una derspedida bonita
+    limpiarPantalla();
+    if (retirado) {
+        cout << ROSA << NEGRITA << "\n================ RETIRARSE ================" << RESET << endl;
+    }
+    mostrarHistorialCompleto(nombre, histJuego, histMonto, histResultado, histSaldoDespues, histCount);
+    mostrarDespedida(nombre, saldo);
+
+    //Se guarda el resumen de la partida en la tabla de clasificacion
+    //Se resta el registro inicial de "Saldo inicial"
+    int partidasJugadas = histCount - 1; 
+    guardarResumenClasificacion(nombre, partidasJugadas, saldoInicial, saldo);
+
+    pausar();
+}
+
+//La funcion main es el menu de bienvenida: permite jugar, ver la tabla de clasificacion o salir
+int main() {
+    srand((unsigned int)time(0));
+    //que las tildes se vean bien en consola
+    SetConsoleOutputCP(CP_UTF8);
+    cout << fixed << setprecision(2);
+
+    int opcionInicio;
+
+    do {
+        limpiarPantalla();
+        mostrarBienvenida();
+
+        cout << DORADO << NEGRITA << "\n1. Jugar" << RESET << endl;
+        cout << DORADO << NEGRITA << "2. Ver tabla de clasificacion" << RESET << endl;
+        cout << DORADO << NEGRITA << "3. Salir" << RESET << endl;
+        cout << CIAN << "Elija una opcion (1-3): " << RESET;
+        cin >> opcionInicio;
+
+        switch (opcionInicio) {
+            case 1:
+                jugarPartida();
+                break;
+            case 2:
+                limpiarPantalla();
+                mostrarTablaClasificacion();
+                pausar();
+                break;
+            case 3:
+                limpiarPantalla();
+                cout << DORADO << NEGRITA << "\nGracias por visitar el casino. Hasta pronto!" << RESET << endl;
+                break;
+            default:
+                cout << ROJO << "Opcion invalida, intente de nuevo." << RESET << endl;
+                pausar();
+        }
+
+    } while (opcionInicio != 3);
+
+    //Y este es el famosisimo final, tambien conocido como return 0; Yeiii :D
+    return 0;
+}//FIN. (Ahora si, nuestro nombres y eso)
